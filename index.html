@@ -27,11 +27,13 @@
   <script>
     const canvas = document.querySelector('#game'), ctx = canvas.getContext('2d'), banner = document.querySelector('#banner');
     const bg = new Image(); bg.src = 'assets/gameplay_background.png';
-    const ball = { x: 170, y: 480, vx: 0, vy: 0, r: 10 }; const hole = { x: 650, y: 130, r: 15 };
+    // Start directly on the large tee ball painted into the course artwork.
+    const TEE = { x: 267, y: 350 };
+    const ball = { x: TEE.x, y: TEE.y, vx: 0, vy: 0, r: 10 }; const hole = { x: 650, y: 130, r: 15 };
     let aim = { x: 1, y: 0 }, charging = false, power = 0, shots = 0, last = performance.now(), won = false, over = false;
     const water = { x: 570, y: 315, w: 215, h: 285 }, sand = { x: 52, y: 147, w: 176, h: 205 }, rough = { x: 395, y: 227, w: 165, h: 118 };
     const inside = (p, r) => p.x > r.x && p.x < r.x+r.w && p.y > r.y && p.y < r.y+r.h;
-    const reset = () => { Object.assign(ball, {x:170,y:480,vx:0,vy:0}); power=0; shots=0; won=false; over=false; banner.className=''; };
+    const reset = () => { Object.assign(ball, {x:TEE.x,y:TEE.y,vx:0,vy:0}); power=0; shots=0; won=false; over=false; charging=false; banner.className=''; };
     function pointer(e) { const r=canvas.getBoundingClientRect(); return {x:(e.clientX-r.left)*800/r.width,y:(e.clientY-r.top)*600/r.height}; }
     canvas.addEventListener('pointermove', e => { if (ball.vx || ball.vy || won || over) return; const p=pointer(e), dx=p.x-ball.x, dy=p.y-ball.y, d=Math.hypot(dx,dy); if(d>4) aim={x:dx/d,y:dy/d}; });
     canvas.addEventListener('pointerdown', e => { if (!ball.vx&&!ball.vy&&!won&&!over) { charging=true; power=0; canvas.setPointerCapture(e.pointerId); } });
@@ -43,7 +45,7 @@
     function update(dt){
       if(charging) power=Math.min(1,power+dt/1.2); if(!ball.vx&&!ball.vy||won||over) return;
       ball.x+=ball.vx*dt; ball.y+=ball.vy*dt;
-      if(inside(ball,water)){ ball.x=170; ball.y=480; ball.vx=ball.vy=0; message('Splash! Back to the tee.'); if(shots>=8){over=true; message('GAME OVER — Press R to retry');} return; }
+      if(inside(ball,water)){ ball.x=TEE.x; ball.y=TEE.y; ball.vx=ball.vy=0; message('Splash! Back to the tee.'); if(shots>=8){over=true; message('GAME OVER — Press R to retry');} return; }
       const speed=Math.hypot(ball.vx,ball.vy), decel=inside(ball,sand)?650:inside(ball,rough)?380:220, next=Math.max(0,speed-decel*dt);
       if(speed) { ball.vx*=next/speed; ball.vy*=next/speed; } if(next<8){ball.vx=ball.vy=0; if(shots>=8){over=true; message('GAME OVER — Press R to retry');}}
       if(ball.x<20||ball.x>780){ball.x=Math.max(20,Math.min(780,ball.x));ball.vx*=-.65;} if(ball.y<25||ball.y>575){ball.y=Math.max(25,Math.min(575,ball.y));ball.vy*=-.65;}
