@@ -28,7 +28,7 @@
     const canvas = document.querySelector('#game'), ctx = canvas.getContext('2d'), banner = document.querySelector('#banner');
     const bg = new Image(); bg.src = 'assets/gameplay_background.png';
     // Start directly on the large tee ball painted into the course artwork.
-    const TEE = { x: 267, y: 350 };
+    const TEE = { x: 130, y: 475 };
     const ball = { x: TEE.x, y: TEE.y, vx: 0, vy: 0, r: 10 }; const hole = { x: 650, y: 130, r: 15 };
     let aim = { x: 1, y: 0 }, charging = false, power = 0, shots = 0, last = performance.now(), won = false, over = false;
     const water = { x: 570, y: 315, w: 215, h: 285 }, sand = { x: 52, y: 147, w: 176, h: 205 }, rough = { x: 395, y: 227, w: 165, h: 118 };
@@ -52,7 +52,12 @@
       if(Math.hypot(ball.x-hole.x,ball.y-hole.y)<16 && next<=110){won=true;ball.vx=ball.vy=0;message(`VICTORY! Hole complete in ${shots} shots`);}
     }
     function draw(){
-      ctx.clearRect(0,0,800,600); if(bg.complete)ctx.drawImage(bg,0,0,800,600); else {ctx.fillStyle='#438b28';ctx.fillRect(0,0,800,600);}
+      ctx.clearRect(0,0,800,600); if(bg.complete) {
+        ctx.drawImage(bg,0,0,800,600);
+        // The source artwork has a ball baked into the tee. Patch that small spot
+        // with nearby tee grass so the single physics ball can move away cleanly.
+        ctx.drawImage(bg, 112, 492, 26, 24, 117, 463, 26, 24);
+      } else {ctx.fillStyle='#438b28';ctx.fillRect(0,0,800,600);}
       ctx.fillStyle='rgba(2,20,12,.72)';ctx.fillRect(12,12,776,56); ctx.fillStyle='#fff';ctx.font='bold 16px Arial';ctx.fillText(`HOLE 1   PAR 5   SHOTS ${shots}/8`,28,35);ctx.fillText(`TERRAIN: ${inside(ball,sand)?'Sand':inside(ball,rough)?'Rough':'Fairway'}`,28,58);ctx.fillText(`POWER ${Math.round(power*100)}%`,645,35);ctx.font='15px Arial';ctx.fillText('Move to aim | Hold to charge | Release to shoot',456,58);
       ctx.fillStyle='rgba(0,0,0,.28)';ctx.beginPath();ctx.ellipse(ball.x,ball.y+10,11,4,0,0,Math.PI*2);ctx.fill();
       if(!ball.vx&&!ball.vy&&!won&&!over){ctx.strokeStyle='#fff';ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(ball.x,ball.y);ctx.lineTo(ball.x+aim.x*70,ball.y+aim.y*70);ctx.stroke();}
