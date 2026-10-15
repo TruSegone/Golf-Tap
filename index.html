@@ -20,7 +20,7 @@
 <body>
   <main>
     <h1>GOLF TAP</h1>
-    <p>A playable browser preview. Aim with your pointer, hold to charge, and release to shoot. Keep it controlled near the cup.</p>
+    <p>Play through five golf missions. Each level adds a tougher stroke limit and new course hazards. Aim, charge your shot, and sink the ball!</p>
     <div id="frame"><canvas id="game" width="800" height="600" aria-label="Golf Tap browser preview"></canvas><div id="banner"></div></div>
     <div class="note">Desktop version: Java + libGDX. Browser preview is provided for quick reviewer feedback.</div>
   </main>
@@ -30,26 +30,36 @@
     // Start directly on the large tee ball painted into the course artwork.
     const TEE = { x: 130, y: 475 };
     const ball = { x: TEE.x, y: TEE.y, vx: 0, vy: 0, r: 10 }; const hole = { x: 650, y: 130, r: 15 };
-    let aim = { x: 1, y: 0 }, charging = false, power = 0, shots = 0, last = performance.now(), won = false, over = false;
+    const levels = [
+      { name:'First Swing', mission:'Sink the ball in 8 shots', limit:8, extra:null },
+      { name:'Bunker Trouble', mission:'Sink it in 7 shots — avoid the sand', limit:7, extra:{x:300,y:265,rx:38,ry:28,label:'BUNKER'} },
+      { name:'Waterline', mission:'Sink it in 6 shots — water resets your ball', limit:6, extra:{x:475,y:350,rx:34,ry:26,label:'WET PATCH'} },
+      { name:'Narrow Approach', mission:'Sink it in 5 shots — avoid both hazards', limit:5, extra:{x:350,y:390,rx:30,ry:42,label:'ROUGH'} },
+      { name:'Champion’s Challenge', mission:'Sink it in 4 shots — every stroke counts', limit:4, extra:{x:445,y:260,rx:34,ry:30,label:'BUNKER'} }
+    ];
+    let levelIndex=0, aim = { x: 1, y: 0 }, charging = false, power = 0, shots = 0, last = performance.now(), won = false, over = false, completeAll=false;
     const water = { x: 570, y: 315, w: 215, h: 285 }, sand = { x: 52, y: 147, w: 176, h: 205 }, rough = { x: 395, y: 227, w: 165, h: 118 };
     const inside = (p, r) => p.x > r.x && p.x < r.x+r.w && p.y > r.y && p.y < r.y+r.h;
-    const reset = () => { Object.assign(ball, {x:TEE.x,y:TEE.y,vx:0,vy:0}); power=0; shots=0; won=false; over=false; charging=false; banner.className=''; };
+    const inExtra = p => { const h=levels[levelIndex].extra; return h && ((p.x-h.x)/h.rx)**2+((p.y-h.y)/h.ry)**2<1; };
+    const reset = () => { Object.assign(ball, {x:TEE.x,y:TEE.y,vx:0,vy:0}); power=0; shots=0; won=false; over=false; charging=false; completeAll=false; aim={x:1,y:-0.5}; banner.className=''; };
     function pointer(e) { const r=canvas.getBoundingClientRect(); return {x:(e.clientX-r.left)*800/r.width,y:(e.clientY-r.top)*600/r.height}; }
     canvas.addEventListener('pointermove', e => { if (ball.vx || ball.vy || won || over) return; const p=pointer(e), dx=p.x-ball.x, dy=p.y-ball.y, d=Math.hypot(dx,dy); if(d>4) aim={x:dx/d,y:dy/d}; });
     canvas.addEventListener('pointerdown', e => { if (!ball.vx&&!ball.vy&&!won&&!over) { charging=true; power=0; canvas.setPointerCapture(e.pointerId); } });
     canvas.addEventListener('pointerup', () => shoot());
     addEventListener('keydown', e => { if(e.key===' '){e.preventDefault(); if(!charging&&!ball.vx&&!ball.vy) charging=true;} if(e.key.toLowerCase()==='r') reset(); });
     addEventListener('keyup', e => { if(e.key===' ') shoot(); });
+    addEventListener('keydown', e => { if(e.key.toLowerCase()==='n' && won && !completeAll){levelIndex++;reset();} else if(e.key.toLowerCase()==='r' && completeAll){levelIndex=0;reset();} });
     function shoot(){ if(!charging) return; charging=false; if(power<.03) return; shots++; ball.vx=aim.x*(180+720*power); ball.vy=aim.y*(180+720*power); power=0; }
     function message(text){ banner.textContent=text; banner.className='show'; setTimeout(()=>banner.className='', 1300); }
     function update(dt){
       if(charging) power=Math.min(1,power+dt/1.2); if(!ball.vx&&!ball.vy||won||over) return;
       ball.x+=ball.vx*dt; ball.y+=ball.vy*dt;
-      if(inside(ball,water)){ ball.x=TEE.x; ball.y=TEE.y; ball.vx=ball.vy=0; message('Splash! Back to the tee.'); if(shots>=8){over=true; message('GAME OVER — Press R to retry');} return; }
-      const speed=Math.hypot(ball.vx,ball.vy), decel=inside(ball,sand)?650:inside(ball,rough)?380:220, next=Math.max(0,speed-decel*dt);
-      if(speed) { ball.vx*=next/speed; ball.vy*=next/speed; } if(next<8){ball.vx=ball.vy=0; if(shots>=8){over=true; message('GAME OVER — Press R to retry');}}
+      if(inside(ball,water)){ ball.x=TEE.x; ball.y=TEE.y; ball.vx=ball.vy=0; message('Splash! Back to the tee.'); if(shots>=levels[levelIndex].limit){over=true; message('MISSION FAILED — Press R to retry');} return; }
+      const extra=inExtra(ball);
+      const speed=Math.hypot(ball.vx,ball.vy), decel=(inside(ball,sand)||extra)?650:inside(ball,rough)?380:220, next=Math.max(0,speed-decel*dt);
+      if(speed) { ball.vx*=next/speed; ball.vy*=next/speed; } if(next<8){ball.vx=ball.vy=0; if(shots>=levels[levelIndex].limit && !won){over=true; message('MISSION FAILED — Press R to retry');}}
       if(ball.x<20||ball.x>780){ball.x=Math.max(20,Math.min(780,ball.x));ball.vx*=-.65;} if(ball.y<25||ball.y>575){ball.y=Math.max(25,Math.min(575,ball.y));ball.vy*=-.65;}
-      if(Math.hypot(ball.x-hole.x,ball.y-hole.y)<16 && next<=110){won=true;ball.vx=ball.vy=0;message(`VICTORY! Hole complete in ${shots} shots`);}
+      if(Math.hypot(ball.x-hole.x,ball.y-hole.y)<16 && next<=110){ball.vx=ball.vy=0; if(shots<=levels[levelIndex].limit){won=true; if(levelIndex===levels.length-1){completeAll=true;message('ALL 5 MISSIONS COMPLETE! Champion!');}else message('MISSION COMPLETE! Next level unlocked');}else{over=true;message('Cup reached, but over the stroke limit! Press R');}}
     }
     function draw(){
       ctx.clearRect(0,0,800,600); if(bg.complete) {
@@ -58,11 +68,16 @@
         // with nearby tee grass so the single physics ball can move away cleanly.
         ctx.drawImage(bg, 112, 492, 26, 24, 117, 463, 26, 24);
       } else {ctx.fillStyle='#438b28';ctx.fillRect(0,0,800,600);}
-      ctx.fillStyle='rgba(2,20,12,.72)';ctx.fillRect(12,12,776,56); ctx.fillStyle='#fff';ctx.font='bold 16px Arial';ctx.fillText(`HOLE 1   PAR 5   SHOTS ${shots}/8`,28,35);ctx.fillText(`TERRAIN: ${inside(ball,sand)?'Sand':inside(ball,rough)?'Rough':'Fairway'}`,28,58);ctx.fillText(`POWER ${Math.round(power*100)}%`,645,35);ctx.font='15px Arial';ctx.fillText('Move to aim | Hold to charge | Release to shoot',456,58);
+      // Draw the added level hazard as a visible patch so the mission matches the gameplay.
+      const hz=levels[levelIndex].extra;
+      if(hz){ctx.fillStyle=levelIndex===2?'rgba(20,145,205,.85)':'rgba(207,157,65,.92)';ctx.beginPath();ctx.ellipse(hz.x,hz.y,hz.rx,hz.ry,0,0,Math.PI*2);ctx.fill();ctx.strokeStyle='rgba(31,70,23,.8)';ctx.lineWidth=5;ctx.stroke();}
+      ctx.fillStyle='rgba(2,20,12,.82)';ctx.fillRect(12,12,776,82); ctx.fillStyle='#fff';ctx.font='bold 16px Arial';ctx.fillText(`LEVEL ${levelIndex+1}/${levels.length}  ${levels[levelIndex].name}  |  SHOTS ${shots}/${levels[levelIndex].limit}`,28,35);ctx.fillText(`TERRAIN: ${inside(ball,sand)?'Sand':inExtra(ball)?'Hazard':inside(ball,rough)?'Rough':'Fairway'}`,28,58);ctx.fillText(`POWER ${Math.round(power*100)}%`,645,35);ctx.font='14px Arial';ctx.fillText(levels[levelIndex].mission,28,80);ctx.fillText('Move to aim | Hold to charge | Release to shoot',420,80);
       ctx.fillStyle='rgba(0,0,0,.28)';ctx.beginPath();ctx.ellipse(ball.x,ball.y+10,11,4,0,0,Math.PI*2);ctx.fill();
       if(!ball.vx&&!ball.vy&&!won&&!over){ctx.strokeStyle='#fff';ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(ball.x,ball.y);ctx.lineTo(ball.x+aim.x*70,ball.y+aim.y*70);ctx.stroke();}
       ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(ball.x,ball.y,10,0,Math.PI*2);ctx.fill();ctx.strokeStyle='#455';ctx.lineWidth=1;ctx.stroke();ctx.fillStyle='#dce7e7';ctx.beginPath();ctx.arc(ball.x-3,ball.y-3,2,0,Math.PI*2);ctx.fill();
       ctx.fillStyle='rgba(3,28,17,.78)';ctx.fillRect(260,565,280,22);ctx.fillStyle='#54d363';ctx.fillRect(263,568,274*power,16);
+      if(won){ctx.fillStyle='rgba(2,24,14,.84)';ctx.fillRect(150,220,500,120);ctx.fillStyle='#ffe36a';ctx.font='bold 27px Arial';ctx.textAlign='center';ctx.fillText(completeAll?'GOLF CHAMPION!':'MISSION COMPLETE!',400,258);ctx.fillStyle='#fff';ctx.font='17px Arial';ctx.fillText(`Completed in ${shots} shot(s)`,400,288);ctx.fillText(completeAll?'Press R to play again':'Press N for next mission',400,316);ctx.textAlign='left';}
+      if(over){ctx.fillStyle='rgba(2,24,14,.84)';ctx.fillRect(150,220,500,120);ctx.fillStyle='#ffdb78';ctx.font='bold 27px Arial';ctx.textAlign='center';ctx.fillText('MISSION FAILED',400,260);ctx.fillStyle='#fff';ctx.font='17px Arial';ctx.fillText('Press R to retry this level',400,295);ctx.textAlign='left';}
       requestAnimationFrame(frame);
     }
     function frame(now){const dt=Math.min(.05,(now-last)/1000);last=now;update(dt);draw();} requestAnimationFrame(frame);
